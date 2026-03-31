@@ -1,0 +1,92 @@
+@startuml
+hide circle
+left to right direction
+skinparam linetype ortho
+skinparam packageStyle rectangle
+
+entity "tenants" as tenants
+entity "ubs" as ubs
+entity "stock_locations" as stock_locations
+
+entity "users" as users
+entity "roles" as roles
+entity "permissions" as permissions
+entity "user_ubs_roles" as user_ubs_roles
+entity "role_permissions" as role_permissions
+entity "user_permissions" as user_permissions
+
+entity "medicines" as medicines
+entity "batches" as batches
+entity "stock_balances" as stock_balances
+entity "stock_movements" as stock_movements
+entity "stock_movement_items" as stock_movement_items
+
+entity "invoices" as invoices
+entity "invoice_items" as invoice_items
+
+entity "patients" as patients
+entity "prescriptions" as prescriptions
+entity "dispensations" as dispensations
+entity "dispensation_items" as dispensation_items
+
+entity "inventories" as inventories
+entity "inventory_items" as inventory_items
+
+entity "movement_reversals" as movement_reversals
+entity "audit_logs" as audit_logs
+
+' Org
+tenants ||--o{ ubs
+ubs ||--o{ stock_locations
+
+' RBAC
+users ||--o{ user_ubs_roles
+ubs ||--o{ user_ubs_roles
+roles ||--o{ user_ubs_roles
+
+roles ||--o{ role_permissions
+permissions ||--o{ role_permissions
+
+users ||--o{ user_permissions
+ubs ||--o{ user_permissions
+permissions ||--o{ user_permissions
+
+' Catalog / Stock
+tenants ||--o{ medicines
+medicines ||--o{ batches
+
+stock_locations ||--o{ stock_balances
+batches ||--o{ stock_balances
+
+ubs ||--o{ stock_movements
+stock_movements ||--o{ stock_movement_items
+batches ||--o{ stock_movement_items
+
+' NF
+ubs ||--o{ invoices
+invoices ||--o{ invoice_items
+medicines ||--o{ invoice_items
+batches ||--o{ invoice_items
+invoices ||..o{ stock_movements : ref
+
+' Patients / Dispensation
+tenants ||--o{ patients
+patients ||--o{ prescriptions
+patients ||--o{ dispensations
+prescriptions ||--o{ dispensations
+dispensations ||--o{ dispensation_items
+batches ||--o{ dispensation_items
+dispensations ||..o{ stock_movements : ref
+
+' Inventory
+ubs ||--o{ inventories
+inventories ||--o{ inventory_items
+batches ||--o{ inventory_items
+inventories ||..o{ stock_movements : ref
+
+' Reversal + Audit
+stock_movements ||--o{ movement_reversals
+ubs ||--o{ audit_logs
+users ||--o{ audit_logs
+
+@enduml

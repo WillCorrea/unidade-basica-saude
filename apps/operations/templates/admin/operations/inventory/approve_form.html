@@ -1,0 +1,56 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  <h1>Aprovar Inventário</h1>
+
+  <p><strong>ID:</strong> {{ inventory.id }}</p>
+  <p><strong>Status:</strong> {{ inventory.status }}</p>
+  <p><strong>UBS:</strong> {{ inventory.ubs }}</p>
+
+  <h2 style="margin-top: 18px;">Divergências (prévia)</h2>
+
+  <table class="adminlist" style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th>Local</th>
+        <th>Medicamento</th>
+        <th>Lote</th>
+        <th>Validade</th>
+        <th>Saldo atual</th>
+        <th>Contado</th>
+        <th>Diferença</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in preview_rows %}
+        <tr>
+          <td>{{ row.location_name }}</td>
+          <td>{{ row.medicine_name }}</td>
+          <td>{{ row.lot_number }}</td>
+          <td>{{ row.expiry_date }}</td>
+          <td>{{ row.current_qty }}</td>
+          <td>{{ row.counted_qty }}</td>
+          <td><strong>{{ row.diff }}</strong></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7">Nenhuma divergência. O estoque já está igual ao contado.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p style="margin-top: 12px;">
+    <strong>Total de ajustes que serão aplicados:</strong> {{ adjustments_applied }}
+  </p>
+
+  <form method="post" style="margin-top: 16px;">
+    {% csrf_token %}
+    <div style="margin-bottom: 12px;">
+      <label for="reason"><strong>Motivo da aprovação</strong></label><br/>
+      <textarea id="reason" name="reason" rows="4" cols="80" required></textarea>
+    </div>
+
+    <input type="submit" value="Confirmar aprovação" class="default" />
+    <a href="../.." class="button cancel-link">Cancelar</a>
+  </form>
+{% endblock %}

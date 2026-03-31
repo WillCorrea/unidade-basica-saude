@@ -1,0 +1,19 @@
+# meds_ubs
+
+Projeto em Python para automações e processamento relacionados ao contexto UBS.
+
+## Estrutura
+
+- `docs/`: documentação funcional e técnica
+- `apps/`: código-fonte principal
+- `tests/`: testes
+- `scripts/`: scripts auxiliares
+
+## Como executar
+- No terminal do ubuntu executar
+    - source .venv/bin/activate
+    - python manage.py runserver
+
+```bash
+pip install -r requirements.txt
+python main.py

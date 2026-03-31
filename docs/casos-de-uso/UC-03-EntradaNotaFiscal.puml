@@ -1,0 +1,27 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Operador de Estoque" as Stock
+actor "Responsável Técnico (RT)" as RT
+
+rectangle "Sistema de Medicamentos UBS" {
+  usecase "Registrar Nota Fiscal" as UC_NF
+  usecase "Adicionar Itens da NF" as UC_Items
+  usecase "Informar Lote e Validade" as UC_Batch
+  usecase "Confirmar Entrada" as UC_ConfirmIn
+  usecase "Registrar Auditoria" as UC_Audit
+}
+
+Stock --> UC_NF
+Stock --> UC_Items
+Stock --> UC_Batch
+Stock --> UC_ConfirmIn
+
+UC_Items ..> UC_NF : <<include>>
+UC_Batch ..> UC_Items : <<include>>
+UC_ConfirmIn ..> UC_Batch : <<include>>
+
+UC_ConfirmIn ..> UC_Audit : <<include>>
+RT --> UC_Audit
+@enduml

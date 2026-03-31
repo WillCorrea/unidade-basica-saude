@@ -1,0 +1,22 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  <h1>Estornar Movimento</h1>
+
+  <p><strong>ID:</strong> {{ movement.id }}</p>
+  <p><strong>Tipo:</strong> {{ movement.movement_type }}</p>
+  <p><strong>Status:</strong> {{ movement.status }}</p>
+  <p><strong>UBS:</strong> {{ movement.ubs }}</p>
+
+  <form method="post" style="margin-top: 16px;">
+    {% csrf_token %}
+    <div style="margin-bottom: 12px;">
+      <label for="reason"><strong>Motivo do estorno</strong></label><br/>
+      <textarea id="reason" name="reason" rows="4" cols="80" required></textarea>
+    </div>
+
+    <input type="submit" value="Confirmar estorno" class="default" />
+    <a href="../.." class="button cancel-link">Cancelar</a>
+  </form>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  <h1>Enviar Inventário para Aprovação</h1>
+
+  <p><strong>ID:</strong> {{ inventory.id }}</p>
+  <p><strong>Status:</strong> {{ inventory.status }}</p>
+  <p><strong>UBS:</strong> {{ inventory.ubs }}</p>
+
+  <form method="post" style="margin-top: 16px;">
+    {% csrf_token %}
+    <div style="margin-bottom: 12px;">
+      <label for="note"><strong>Observação (opcional)</strong></label><br/>
+      <textarea id="note" name="note" rows="4" cols="80"></textarea>
+    </div>
+
+    <input type="submit" value="Confirmar envio" class="default" />
+    <a href="../.." class="button cancel-link">Cancelar</a>
+  </form>
+{% endblock %}

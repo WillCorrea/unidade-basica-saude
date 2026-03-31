@@ -1,0 +1,7 @@
+UBS = "UBS"
+STOCK_LOCATION = "Local de Estoque"
+STOCK_MOVEMENT = "Movimentação de Estoque"
+DISPENSATION = "Dispensação"
+INVENTORY = "Inventário"
+INVOICE = "Nota Fiscal"
+BATCH = "Lote"
