@@ -1,0 +1,19 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Usuário" as User
+
+rectangle "Sistema de Medicamentos UBS" {
+  usecase "Realizar Login" as UC_Login
+  usecase "Selecionar UBS Ativa" as UC_SelectUBS
+  usecase "Acessar Dashboard" as UC_Dashboard
+}
+
+User --> UC_Login
+User --> UC_SelectUBS
+User --> UC_Dashboard
+
+UC_SelectUBS ..> UC_Login : <<include>>
+UC_Dashboard ..> UC_Login : <<include>>
+@enduml

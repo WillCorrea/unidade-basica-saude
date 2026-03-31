@@ -1,0 +1,29 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Responsável Técnico (RT)" as RT
+actor "Administrador Municipal" as Admin
+
+rectangle "Sistema de Medicamentos UBS" {
+  usecase "Localizar Movimentação" as UC_FindMove
+  usecase "Validar Elegibilidade do Estorno" as UC_Validate
+  usecase "Informar Justificativa" as UC_Reason
+  usecase "Confirmar Estorno" as UC_Confirm
+  usecase "Gerar Movimentação Inversa" as UC_Inverse
+  usecase "Atualizar Estoque" as UC_UpdateStock
+  usecase "Registrar Auditoria" as UC_Audit
+}
+
+RT --> UC_FindMove
+RT --> UC_Confirm
+Admin --> UC_FindMove
+Admin --> UC_Confirm
+
+UC_Validate ..> UC_FindMove : <<include>>
+UC_Reason ..> UC_Confirm : <<include>>
+UC_Confirm ..> UC_Validate : <<include>>
+UC_Inverse ..> UC_Confirm : <<include>>
+UC_UpdateStock ..> UC_Inverse : <<include>>
+UC_UpdateStock ..> UC_Audit : <<include>>
+@enduml

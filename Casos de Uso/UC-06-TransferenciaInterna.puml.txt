@@ -1,0 +1,24 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Operador de Estoque" as Stock
+
+rectangle "Sistema de Medicamentos UBS" {
+  usecase "Selecionar Local de Origem" as UC_Source
+  usecase "Selecionar Local de Destino" as UC_Target
+  usecase "Selecionar Medicamento/Lote/Quantidade" as UC_Select
+  usecase "Confirmar Transferência" as UC_Confirm
+  usecase "Registrar Auditoria" as UC_Audit
+}
+
+Stock --> UC_Source
+Stock --> UC_Target
+Stock --> UC_Select
+Stock --> UC_Confirm
+
+UC_Select ..> UC_Source : <<include>>
+UC_Select ..> UC_Target : <<include>>
+UC_Confirm ..> UC_Select : <<include>>
+UC_Confirm ..> UC_Audit : <<include>>
+@enduml

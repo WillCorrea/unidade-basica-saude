@@ -1,0 +1,336 @@
+@startuml
+hide circle
+skinparam linetype ortho
+skinparam packageStyle rectangle
+
+' ======================
+' MODULO: ORGANIZACIONAL
+' ======================
+package "Organizacional" {
+  entity "tenants" as tenants {
+    *id : uuid <<PK>>
+    --
+    name : text
+  }
+
+  entity "ubs" as ubs {
+    *id : uuid <<PK>>
+    --
+    tenant_id : uuid <<FK>>
+    name : text
+    cnes : text
+    active : bool
+    --
+    address_street : text
+    address_number : text
+    address_neighborhood : text
+    address_city : text
+    address_state : char(2)
+    address_zip : text
+    address_complement : text
+  }
+
+  entity "stock_locations" as stock_locations {
+    *id : uuid <<PK>>
+    --
+    ubs_id : uuid <<FK>>
+    name : text
+    active : bool
+  }
+
+  tenants ||--o{ ubs : has
+  ubs ||--o{ stock_locations : has
+}
+
+' ======================
+' MODULO: RBAC
+' ======================
+package "RBAC (Roles & Permissions)" {
+  entity "users" as users {
+    *id : uuid <<PK>>
+    --
+    username : text <<UQ>>
+    full_name : text
+    active : bool
+  }
+
+  entity "roles" as roles {
+    *id : uuid <<PK>>
+    --
+    code : text <<UQ>>
+    name : text
+  }
+
+  entity "permissions" as permissions {
+    *id : uuid <<PK>>
+    --
+    code : text <<UQ>>
+    name : text
+  }
+
+  entity "user_ubs_roles" as user_ubs_roles {
+    *id : uuid <<PK>>
+    --
+    user_id : uuid <<FK>>
+    ubs_id : uuid <<FK>>
+    role_id : uuid <<FK>>
+    active : bool
+  }
+
+  entity "role_permissions" as role_permissions {
+    *id : uuid <<PK>>
+    --
+    role_id : uuid <<FK>>
+    permission_id : uuid <<FK>>
+    --
+    (role_id, permission_id) <<UQ>>
+  }
+
+  entity "user_permissions" as user_permissions {
+    *id : uuid <<PK>>
+    --
+    user_id : uuid <<FK>>
+    ubs_id : uuid <<FK>>  ' nullable
+    permission_id : uuid <<FK>>
+    effect : text  ' ALLOW/DENY
+    --
+    (user_id, ubs_id, permission_id) <<UQ>>
+  }
+
+  users ||--o{ user_ubs_roles
+  ubs ||--o{ user_ubs_roles
+  roles ||--o{ user_ubs_roles
+
+  roles ||--o{ role_permissions
+  permissions ||--o{ role_permissions
+
+  users ||--o{ user_permissions
+  ubs ||--o{ user_permissions
+  permissions ||--o{ user_permissions
+}
+
+' ======================
+' MODULO: CATÁLOGO / ESTOQUE
+' ======================
+package "Catálogo e Estoque" {
+  entity "medicines" as medicines {
+    *id : uuid <<PK>>
+    --
+    tenant_id : uuid <<FK>>
+    name : text
+    presentation : text
+    unit : text
+    active : bool
+  }
+
+  entity "batches" as batches {
+    *id : uuid <<PK>>
+    --
+    tenant_id : uuid <<FK>>
+    medicine_id : uuid <<FK>>
+    batch_number : text
+    expiry_date : date
+    --
+    (tenant_id, medicine_id, batch_number, expiry_date) <<UQ>>
+  }
+
+  entity "stock_balances" as stock_balances {
+    *id : uuid <<PK>>
+    --
+    ubs_id : uuid <<FK>>
+    stock_location_id : uuid <<FK>>
+    batch_id : uuid <<FK>>
+    quantity : numeric
+    --
+    (stock_location_id, batch_id) <<UQ>>
+  }
+
+  tenants ||--o{ medicines
+  medicines ||--o{ batches
+  stock_locations ||--o{ stock_balances
+  batches ||--o{ stock_balances
+}
+
+' ======================
+' MODULO: OPERAÇÕES
+' ======================
+package "Operações (NF, Dispensação, Inventário, Movimentações)" {
+  entity "stock_movements" as stock_movements {
+    *id : uuid <<PK>>
+    --
+    ubs_id : uuid <<FK>>
+    movement_type : text
+    source_location_id : uuid <<FK>>
+    target_location_id : uuid <<FK>>
+    reference_type : text
+    reference_id : uuid
+    reason : text
+    created_by_user_id : uuid <<FK>>
+    created_at : timestamp
+  }
+
+  entity "stock_movement_items" as stock_movement_items {
+    *id : uuid <<PK>>
+    --
+    stock_movement_id : uuid <<FK>>
+    batch_id : uuid <<FK>>
+    quantity : numeric
+    unit_cost : numeric
+  }
+
+  entity "invoices" as invoices {
+    *id : uuid <<PK>>
+    --
+    ubs_id : uuid <<FK>>
+    invoice_number : text
+    series : text
+    supplier_name : text
+    receipt_date : date
+    status : text
+    created_by_user_id : uuid <<FK>>
+  }
+
+  entity "invoice_items" as invoice_items {
+    *id : uuid <<PK>>
+    --
+    invoice_id : uuid <<FK>>
+    medicine_id : uuid <<FK>>
+    batch_id : uuid <<FK>>
+    quantity : numeric
+    unit_cost : numeric
+  }
+
+  entity "patients" as patients {
+    *id : uuid <<PK>>
+    --
+    tenant_id : uuid <<FK>>
+    cns : text
+    cpf : text
+    full_name : text
+  }
+
+  entity "prescriptions" as prescriptions {
+    *id : uuid <<PK>>
+    --
+    ubs_id : uuid <<FK>>
+    patient_id : uuid <<FK>>
+    prescriber_name : text
+    origin_unit : text
+    prescription_type : text
+    prescription_date : date
+    attachment_path : text
+    created_by_user_id : uuid <<FK>>
+  }
+
+  entity "dispensations" as dispensations {
+    *id : uuid <<PK>>
+    --
+    ubs_id : uuid <<FK>>
+    stock_location_id : uuid <<FK>>
+    patient_id : uuid <<FK>>
+    prescription_id : uuid <<FK>>
+    status : text
+    created_by_user_id : uuid <<FK>>
+    created_at : timestamp
+  }
+
+  entity "dispensation_items" as dispensation_items {
+    *id : uuid <<PK>>
+    --
+    dispensation_id : uuid <<FK>>
+    medicine_id : uuid <<FK>>
+    batch_id : uuid <<FK>>
+    quantity : numeric
+    lot_selection_mode : text
+  }
+
+  entity "inventories" as inventories {
+    *id : uuid <<PK>>
+    --
+    ubs_id : uuid <<FK>>
+    stock_location_id : uuid <<FK>>
+    status : text
+    created_by_user_id : uuid <<FK>>
+    approved_by_user_id : uuid <<FK>>
+  }
+
+  entity "inventory_items" as inventory_items {
+    *id : uuid <<PK>>
+    --
+    inventory_id : uuid <<FK>>
+    batch_id : uuid <<FK>>
+    system_quantity_snapshot : numeric
+    counted_quantity : numeric
+    difference_quantity : numeric
+  }
+
+  entity "movement_reversals" as movement_reversals {
+    *id : uuid <<PK>>
+    --
+    original_movement_id : uuid <<FK>>
+    reversal_movement_id : uuid <<FK>>
+    reason : text
+    created_by_user_id : uuid <<FK>>
+    --
+    (original_movement_id) <<UQ>>
+  }
+
+  ubs ||--o{ stock_movements
+  users ||--o{ stock_movements
+  stock_movements ||--o{ stock_movement_items
+  batches ||--o{ stock_movement_items
+
+  ubs ||--o{ invoices
+  users ||--o{ invoices
+  invoices ||--o{ invoice_items
+  medicines ||--o{ invoice_items
+  batches ||--o{ invoice_items
+  invoices ||..o{ stock_movements : ref(NF)
+
+  tenants ||--o{ patients
+  patients ||--o{ prescriptions
+  ubs ||--o{ prescriptions
+  users ||--o{ prescriptions
+
+  patients ||--o{ dispensations
+  prescriptions ||--o{ dispensations
+  ubs ||--o{ dispensations
+  stock_locations ||--o{ dispensations
+  users ||--o{ dispensations
+
+  dispensations ||--o{ dispensation_items
+  medicines ||--o{ dispensation_items
+  batches ||--o{ dispensation_items
+  dispensations ||..o{ stock_movements : ref(DISP)
+
+  ubs ||--o{ inventories
+  stock_locations ||--o{ inventories
+  users ||--o{ inventories
+  inventories ||--o{ inventory_items
+  batches ||--o{ inventory_items
+  inventories ||..o{ stock_movements : ref(INV)
+
+  stock_movements ||--o{ movement_reversals : original/reversal
+  users ||--o{ movement_reversals
+}
+
+' ======================
+' MODULO: AUDITORIA
+' ======================
+package "Auditoria" {
+  entity "audit_logs" as audit_logs {
+    *id : uuid <<PK>>
+    --
+    ubs_id : uuid <<FK>>
+    user_id : uuid <<FK>>
+    action : text
+    entity_type : text
+    entity_id : uuid
+    created_at : timestamp
+  }
+
+  ubs ||--o{ audit_logs
+  users ||--o{ audit_logs
+}
+
+@enduml
