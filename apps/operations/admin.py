@@ -5,7 +5,7 @@ from django.urls import path
 from django.utils.html import format_html
 from apps.operations.services.invoice_service import finalize_invoice, InvoiceFinalizeError
 from apps.core.models import UBS
-from .models import Patient, Prescription, Invoice, InvoiceItem, Dispensation, DispensationItem, Inventory
+from .models import Patient, Prescription, Invoice, InvoiceItem, Dispensation, DispensationItem, Inventory, Order, OrderItem
 from apps.operations.services.dispensation_service import confirm_dispensation, DispensationConfirmError
 
 from apps.audit.services.services import log_event
@@ -15,7 +15,10 @@ from .models import Inventory, InventoryCountItem
 from apps.operations.services.inventory_service import approve_inventory, InventoryApproveError,InventorySubmitError, submit_inventory
 from django.template.response import TemplateResponse
 from django.urls import reverse
-
+from django.http import HttpResponse
+from django.core.mail import send_mail
+from django.conf import settings
+from apps.operations.services.order_service import receive_order_partial, OrderReceiveError
 
 
 @admin.register(Patient)
@@ -345,5 +348,163 @@ class InventoryAdmin(admin.ModelAdmin):
             self.message_user(request, "Inventário enviado para aprovação.", level=messages.SUCCESS)
         except InventorySubmitError as e:
             self.message_user(request, f"Falha ao enviar: {e}", level=messages.ERROR)
+
+        return redirect("../..")
+
+
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 1
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ("id", "status", "ubs", "stock_location", "created_at", "receive_button", "print_button", "email_button")
+    list_filter = ("status", "ubs", "stock_location")
+    search_fields = ("id", "created_by__username", "note")
+    inlines = [OrderItemInline]
+    actions = ["action_submit_orders", "action_cancel_orders", "action_send_orders_email"]
+
+    def receive_button(self, obj):
+        if obj.status in [obj.STATUS_SUBMITTED, obj.STATUS_PARTIALLY_RECEIVED]:
+            return format_html('<a class="button" href="{}">Receber</a>', f"{obj.id}/receive/")
+        return "-"
+    receive_button.short_description = "Receber"
+
+    def print_button(self, obj):
+        return format_html('<a class="button" href="{}">Imprimir</a>', f"{obj.id}/print/")
+    print_button.short_description = "Imprimir"
+
+    def email_button(self, obj):
+        return format_html('<a class="button" href="{}">Enviar email</a>', f"{obj.id}/email/")
+    email_button.short_description = "Email"
+
+    def action_submit_orders(self, request, queryset):
+        updated = 0
+        for order in queryset.filter(status=Order.STATUS_DRAFT):
+            order.submit()
+            updated += 1
+        self.message_user(request, f"{updated} pedido(s) enviados")
+    action_submit_orders.short_description = "Enviar pedidos selecionados"
+
+    def action_cancel_orders(self, request, queryset):
+        updated = queryset.exclude(status=Order.STATUS_RECEIVED).update(status=Order.STATUS_CANCELLED)
+        self.message_user(request, f"{updated} pedido(s) cancelados")
+    action_cancel_orders.short_description = "Cancelar pedidos selecionados"
+
+    def action_send_orders_email(self, request, queryset):
+        sent = 0
+        for order in queryset:
+            if not order.created_by.email:
+                continue
+            subject = f"Pedido {order.id} ({order.status})"
+            message = self._order_text(order)
+            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [order.created_by.email])
+            sent += 1
+        self.message_user(request, f"{sent} e-mail(s) enviados")
+    action_send_orders_email.short_description = "Enviar pedido por e-mail"
+
+    def _order_text(self, order):
+        lines = [f"Pedido {order.id}", f"Status: {order.status}", f"UBS: {order.ubs}", f"Local: {order.stock_location}", "Itens:"]
+        for item in order.items.all():
+            lines.append(f" - {item.medicine}: solicitado {item.quantity_requested}, recebido {item.quantity_received}, pendente {item.quantity_pending}")
+        return "\n".join(lines)
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path("<uuid:order_id>/receive/", self.admin_site.admin_view(self.receive_view), name="order-receive"),
+            path("<uuid:order_id>/print/", self.admin_site.admin_view(self.print_view), name="order-print"),
+            path("<uuid:order_id>/email/", self.admin_site.admin_view(self.email_view), name="order-email"),
+        ]
+        return custom_urls + urls
+
+
+    def print_view(self, request, order_id):
+        order = Order.objects.prefetch_related("items__medicine").filter(id=order_id).first()
+        if not order:
+            self.message_user(request, "Pedido não encontrado.", level=messages.ERROR)
+            return redirect("../..")
+
+        return HttpResponse(self._order_text(order), content_type="text/plain")
+
+    def email_view(self, request, order_id):
+        order = Order.objects.prefetch_related("items__medicine").filter(id=order_id).first()
+        if not order:
+            self.message_user(request, "Pedido não encontrado.", level=messages.ERROR)
+            return redirect("../..")
+
+        if not order.created_by.email:
+            self.message_user(request, "Usuário não possui e-mail cadastrado.", level=messages.ERROR)
+            return redirect("../..")
+
+        subject = f"Pedido {order.id}"  
+        message = self._order_text(order)
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [order.created_by.email])
+
+        self.message_user(request, "E-mail enviado com sucesso.", level=messages.SUCCESS)
+        return redirect("../..")
+
+    def receive_view(self, request, order_id):
+        order = Order.objects.prefetch_related("items__medicine").filter(id=order_id).first()
+
+        if not order:
+            self.message_user(request, "Pedido não encontrado.", level=messages.ERROR)
+            return redirect("../..")
+
+        # GET → renderiza tela
+        if request.method == "GET":
+            context = dict(
+                self.admin_site.each_context(request),
+                order=order,
+                items=order.items.all(),
+            )
+            return TemplateResponse(
+                request,
+                "admin/operations/order/receive_form.html",
+                context
+            )
+
+        # POST → processa recebimento
+        items_data = []
+
+        for item in order.items.all():
+            qty = request.POST.get(f"qty_{item.id}")
+            lot = request.POST.get(f"lot_{item.id}")
+            exp = request.POST.get(f"exp_{item.id}")
+
+            if not qty:
+                continue
+
+            try:
+                qty = float(qty)
+            except:
+                continue
+
+            if qty <= 0:
+                continue
+
+            items_data.append({
+                "order_item_id": item.id,
+                "quantity": qty,
+                "lot_number": lot or "SEM-LOTE",
+                "expiry_date": exp,
+            })
+
+        if not items_data:
+            self.message_user(request, "Nenhum item informado.", level=messages.ERROR)
+            return redirect(request.path)
+
+        try:
+            receive_order_partial(
+                order_id=order.id,
+                user=request.user,
+                ubs=order.ubs,
+                items_data=items_data,
+            )
+
+            self.message_user(request, "Recebimento realizado com sucesso.", level=messages.SUCCESS)
+
+        except OrderReceiveError as e:
+            self.message_user(request, f"Erro: {e}", level=messages.ERROR)
 
         return redirect("../..")

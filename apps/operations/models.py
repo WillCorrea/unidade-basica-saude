@@ -2,6 +2,7 @@ from django.db import models
 
 # Create your models here.
 import uuid
+from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from apps.core.models import UBS
@@ -318,3 +319,80 @@ class InventoryCountItem(models.Model):
 
     def __str__(self):
         return f"{self.inventory_id} | {self.stock_location} | {self.batch} => {self.counted_quantity}"
+
+
+class Order(models.Model):
+    STATUS_DRAFT = "DRAFT"
+    STATUS_SUBMITTED = "SUBMITTED"
+    STATUS_PARTIALLY_RECEIVED = "PARTIALLY_RECEIVED"
+    STATUS_RECEIVED = "RECEIVED"
+    STATUS_CANCELLED = "CANCELLED"
+
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "DRAFT"),
+        (STATUS_SUBMITTED, "SUBMITTED"),
+        (STATUS_PARTIALLY_RECEIVED, "PARTIALLY_RECEIVED"),
+        (STATUS_RECEIVED, "RECEIVED"),
+        (STATUS_CANCELLED, "CANCELLED"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    ubs = models.ForeignKey("core.UBS", on_delete=models.PROTECT)
+    stock_location = models.ForeignKey("stock.StockLocation", on_delete=models.PROTECT, null=True, blank=True, related_name="orders")
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    received_at = models.DateTimeField(null=True, blank=True)
+
+    note = models.TextField(blank=True)
+
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+
+    def submit(self):
+        if self.status != self.STATUS_DRAFT:
+            raise ValueError("Somente pedidos em draft podem ser submetidos")
+        self.status = self.STATUS_SUBMITTED
+        self.save(update_fields=["status"])
+
+    def __str__(self):
+        return f"Order {self.id} ({self.status})"
+
+
+class OrderItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="items")
+
+    medicine = models.ForeignKey("catalog.Medicine", on_delete=models.PROTECT)
+
+    quantity_requested = models.DecimalField(max_digits=18, decimal_places=3)
+
+    @property
+    def quantity_received(self):
+        """Calcula a quantidade total recebida somando todos os OrderReceiveItem"""
+        return self.receives.aggregate(total=models.Sum('quantity'))['total'] or Decimal('0')
+
+    @property
+    def quantity_pending(self):
+        """Calcula a quantidade ainda pendente de recebimento"""
+        return self.quantity_requested - self.quantity_received
+
+    def __str__(self):
+        return f"{self.medicine} ({self.quantity_requested})"
+
+
+class OrderReceiveItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    order = models.ForeignKey("Order", on_delete=models.PROTECT, related_name="receives")
+
+    order_item = models.ForeignKey("OrderItem", on_delete=models.PROTECT, related_name="receives")
+
+    batch = models.ForeignKey("catalog.Batch", on_delete=models.PROTECT)
+
+    quantity = models.DecimalField(max_digits=18, decimal_places=3)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+
